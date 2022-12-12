@@ -20,8 +20,6 @@ def plot(y_val, X, totalSize, index, title, color, ticks): #, maximun_val):
     plot = plt.subplot2grid(totalSize, index, rowspan=2, colspan=2)
     plot.plot(X,y_val, color = color)
     plot.set_title(title)
-    #plot.set_ylim((0, 0.0005))
-    #plot.set_ylim((0, maximun_val))
     for tick in ticks:
         plot.axvline(tick, linestyle='--')
     plt.gca().axes.get_xaxis().set_visible(False)
@@ -57,7 +55,7 @@ def plotDataFromBothChunks(X1, X2, ticks1, ticks2, title="smiles"):
     plt.show()
 
 
-#################### main #####################
+#################### main #########################
 
 num_channels = 16
 A = 0
