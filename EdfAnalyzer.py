@@ -3,9 +3,11 @@ from scipy import signal
 import numpy as np
 #from scipy.signal import butter, lfilter
 from sklearn.decomposition import FastICA
-from cuml.decomposition import PCA
+#from cuml.decomposition import PCA
+from sklearn.decomposition import PCA
 import cupy as xp
 from scipy.signal import butter, sosfilt, filtfilt, sosfiltfilt
+from HelperFunctions import isMyAnnotation, cleanSpace
 
 #from mne.preprocessing import ICA
 #from picard import picard
@@ -39,9 +41,11 @@ def butter_bandpass_filter(data, lowcut, highcut, fs, order=2):
         return y
 
 def window_rms_single(a, window_size = 800):
-    a2 = np.power(a,2)
+    a2 = np.power(np.array(a),2)
     window = np.ones(window_size)/float(window_size)
-    return np.sqrt(np.convolve(a2, window, 'valid'))
+    result =  np.sqrt(np.convolve(a2, window, 'valid'))
+    cleanSpace()
+    return result
 
 def NotchFilterSignal(noisySignal, sampling_rate, removed_frequency=50.0, Q_Factor=30.0):
     # Design notch filter
@@ -102,7 +106,7 @@ class EdfAnalyzer:
         pass
     
     @staticmethod
-    def readEdf(f : pyedflib.EdfReader, doButter = True, doRms = True, rmsWindowSizeInMs = 100):
+    def readEdf(f : pyedflib.EdfReader, doButter = True):
         sampling_rate = int(f.getSampleFrequency(0))
         n = 16 #f.signals_in_file
         num_sets = 1
@@ -111,14 +115,11 @@ class EdfAnalyzer:
         sigbufs = np.zeros((n, size_limit))
         for i in np.arange(n):
             sigbufs[i, :] = f.readSignal(i, start=0, n=size_limit)
-
-        rmsWindowSize = int((rmsWindowSizeInMs/1000)*sampling_rate)
+        
         #Filter before ICA
         sigbufs = NotchFilterSignal(sigbufs, sampling_rate)
         if (doButter):
             sigbufs = butter_bandpass_filter(sigbufs, 20.0, 400.0, sampling_rate)
-        if ( doRms ):
-            sigbufs = __class__.window_rms(sigbufs, rmsWindowSize)
         
         return sigbufs, sampling_rate
     
@@ -140,11 +141,22 @@ class EdfAnalyzer:
     @staticmethod
     def reduceMeanFromEachCol(Y):
         colMeans = np.mean(Y, axis=0)
-        for i in range(0, Y.shape[1]):
-            Y[:,i] = Y[:,i] - colMeans[i]
+        # for i in range(0, Y.shape[1]):
+        #     Y[:,i] = Y[:,i] - colMeans[i]
+        return Y - colMeans
     
     @staticmethod
-    def window_rms(a, window_size=800):
+    def getIntervalWithWindowReduction(Y, start, end, window=2000):
+        meanVec = np.mean(Y[:, start-window : start], axis=1)
+        return Y[:, start:end] - np.matrix(meanVec).T
+    
+    def getIntervalWithWindowDivision(Y, start, end, window=2000):
+        meanVec = np.mean(Y[:, start-window : start], axis=1)
+        return Y[:, start:end] / np.matrix(meanVec).T
+
+    @staticmethod
+    def window_rms(a, window_size=200):
+        window_size = window_size*4 # divide by 1000, and multiply by 4000
         return np.array([window_rms_single(x,window_size) for x in a])
 
     @staticmethod
@@ -158,7 +170,7 @@ class EdfAnalyzer:
         annotations = f.readAnnotations()
         startIndex = np.where(annotations[2] == "StartExperiment")[0][-1]
         #correctByIdx = np.where(annotations[2] == "Recording Started")[0][0]
-        endIndex = startIndex + 50 #including.
+        endIndex = len(annotations[2])
         startCorrectIdx = np.where(annotations[2] == "Smile_0_start")[0][0]
         __class__.startCorrectionTime = annotations[0][startCorrectIdx] - 120
         #correctBy = annotations[0][correctByIdx]
@@ -167,8 +179,10 @@ class EdfAnalyzer:
 
         #Should I notice that recording startes is not exactly at 0.00
 
-        for i in range(startIndex+1, endIndex+1):
-            annotation = annotations[2][i]
+        for i in range(startIndex+1, endIndex):
+            annotation = str(annotations[2][i])
+            if ( not isMyAnnotation(annotation)):
+                continue
             timing = annotations[0][i] - correctBy - __class__.startCorrectionTime # fix error by xTrodes.
             extractedAnnotation = extractAnnotation(annotation, timing)
             index = "%s_%s_%d" % (extractedAnnotation.Type, extractedAnnotation.Story, extractedAnnotation.TrialId)

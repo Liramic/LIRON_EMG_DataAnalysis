@@ -11,6 +11,8 @@ import matplotlib.pyplot as plt
 from scipy.stats import zscore
 #from torch import maximum
 from EdfAnalyzer import EdfAnalyzer
+from HelperFunctions import cleanSpace, matrixCorrelation
+from os import path
 
 num_components = 16
 
@@ -64,56 +66,90 @@ signals = []
 chunks = []
 freq = 0
 
+ica_type = "together" # none, together, or seperate
+isZscore = True
+
 # read both EDF files
 #paths = ["29052022_1230_A_Recording_00_SD.edf", "29052022_1230_b_Recording_00_SD.edf"]
-paths = [r"C:\Liron\neuroscience\PHD\First year experiment - EMG\DataAnalysis\EMG\06062022_1100\06062022_1100_A_Recording_00_SD.edf", r"C:\Liron\neuroscience\PHD\First year experiment - EMG\DataAnalysis\EMG\06062022_1100\06062022_1100_B_Recording_00_SD.edf"]
-for path in paths:
-    f = pyedflib.EdfReader(path)
-    Y, freq = EdfAnalyzer.readEdf(f, doButter=False)
+#paths = [(r"C:\Liron\neuroscience\PHD\First year experiment - EMG\DataAnalysis\EMG\06062022_1100\06062022_1100_A_Recording_00_SD.edf", 0.4), (r"C:\Liron\neuroscience\PHD\First year experiment - EMG\DataAnalysis\EMG\06062022_1100\06062022_1100_B_Recording_00_SD.edf", 0.1)]
+paths = [(r"C:\Liron\neuroscience\PHD\First year experiment - EMG\DataAnalysis\WSL\20112022_1545\20112022_1545_A_Recording_00_SD.edf", 0.75),(r"C:\Liron\neuroscience\PHD\First year experiment - EMG\DataAnalysis\WSL\20112022_1545\20112022_1545_B_Recording_00_SD.edf", 0.25)]
+
+for pathProperties in paths:
+    f = pyedflib.EdfReader(pathProperties[0])
+    Y, freq = EdfAnalyzer.readEdf(f, doButter=True)
     signals.append(Y)
     #EdfAnalyzer.reduceMeanFromEachCol(Y)
-    chunks.append(EdfAnalyzer.getAnnotationChunks(f))
+    chunks.append(EdfAnalyzer.getAnnotationChunks(f, pathProperties[1]))
     f.close()
 
-# Append Signals
-appendedSignal = []
-for i in range(num_channels):
-    appendedSignal.append(np.append(signals[A][i], signals[B][i]))
-
-# ICA 
-w, x = EdfAnalyzer.ICA(np.matrix(appendedSignal), num_channels) # W*Y = X
-# x = EdfAnalyzer.window_rms(x) - perform the RMS after the split
-
-# seperate components :
 independentComponents = [[], []]
-for i in range(num_channels):
-    splitValue = len(signals[A][i])
-    independentComponents[A].append(x[i][:splitValue])
-    independentComponents[B].append(x[i][splitValue:])
+if ( ica_type != "none"):
+    if ( ica_type == "together") :
+        # Append Signals
+        appendedSignal = np.c_[signals[A], signals[B]]
+
+        # ICA 
+        w, x = EdfAnalyzer.ICA(np.matrix(appendedSignal), num_channels) # W*Y = X
+        # x = EdfAnalyzer.window_rms(x) - perform the RMS after the split
+
+        # seperate components :
+        splitValue = len(signals[A][0])
+        independentComponents[A] = x[:, :splitValue]
+        independentComponents[B] = x[:, splitValue:]
+    else:
+        for p in [A,B]:
+            w, x = EdfAnalyzer.ICA(np.matrix(signals[p]), num_channels)
+            independentComponents[p] = np.array(x)
+else:
+    independentComponents = signals
+
+# free up space
+w=0
+x=0
+signals=0
+cleanSpace()
+
+#remove mean from cols
+#independentComponents = [ EdfAnalyzer.reduceMeanFromEachCol(comps) for comps in independentComponents]
 
 # RMS
-#independentComponents = [ EdfAnalyzer.window_rms(comps) for comps in independentComponents]
+independentComponents = [ EdfAnalyzer.window_rms(comps) for comps in independentComponents]
+cleanSpace()
 
-# take only smiles chunk.
-# smile_chunks = [[],[]]
-# for i in range(3):
-#     for participant in [A,B]:
-#         chunk = chunks[participant]["smile__%d" % i]
-#         chunk_start = int(chunk.Start.Time*freq)
-#         chunk_end = int(chunk.End.Time*freq)
-#         chunk.data = [independentComponents[participant][c][chunk_start:chunk_end] for c in range(num_channels)]
-#         smile_chunks[participant].append(chunk)
+if isZscore:
+    for p in [A,B]:
+        independentComponents[p] = np.array([zscore(x) for x in independentComponents[p]])
 
-states = ["smile", "angry", "blink"]
-for state in states :
-    ticks = []
-    smile_whole_chunks = []
-    for particiapnt in [A,B]:
-        ticks.append(EdfAnalyzer.getCallibrationTicks(chunks[particiapnt], freq, state))
-        start = ticks[particiapnt][0]
-        end = ticks[particiapnt][-1]
-        smile_whole_chunks.append([x[i][start:end] for i in range(num_channels)])
-    # print both smile chunks ICA marked (2*16 graphs):
-    plotDataFromBothChunks(smile_whole_chunks[A], smile_whole_chunks[B], ticks[A], ticks[B])
+for key in chunks[0]:
+    fig, axs = plt.subplots(1, 2)
+    chunk_data = [[],[]]
+    for participant in [A,B]:
+        chunk = chunks[participant][key]
+        chunk_start = int(chunk.Start.Time*freq)
+        chunk_end = int(chunk.End.Time*freq)
+        chunk_data[participant] = independentComponents[participant][: , chunk_start:chunk_end]
+        #chunk_data = EdfAnalyzer.getIntervalWithWindowReduction(Y, chunk_start, chunk_end)
+        #chunk_data = np.diff(independentComponents[participant][: , chunk_start:chunk_end])
+        #chunk_data = np.diff(EdfAnalyzer.getIntervalWithWindowDivision(Y, chunk_start, chunk_end))
+        axs[participant].imshow(chunk_data[participant], cmap='hot', aspect='auto', interpolation="gaussian")
+        axs[participant].set_title(f"Participant : {participant}, time: {key}")
+    fname = path.join(path.dirname(pathProperties[0]), "Heatmaps", fr"{key}.png")
+    plt.show()
+    plt.savefig(fname)
+    plt.clf()
+
+
+# for state in states :
+#     ticks = []
+#     chunksToPlot = []
+#     for particiapnt in [A,B]:
+#         ticks.append(EdfAnalyzer.getCallibrationTicks(chunks[particiapnt], freq, state))
+#         start = ticks[particiapnt][0]
+#         end = ticks[particiapnt][-1]
+#         chunksToPlot.append([x[i][start:end] for i in range(num_channels)])
+#     # print both smile chunks ICA marked (2*16 graphs):
+#     #plotDataFromBothChunks(chunksToPlot[A], chunksToPlot[B], ticks[A], ticks[B])
+#     plt.imshow(chunksToPlot[A])
+#     plt.imshow(chunksToPlot[B])
 
 
