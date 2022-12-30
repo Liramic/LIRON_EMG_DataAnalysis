@@ -218,6 +218,7 @@ def PredictSmiles(sessionId, workingDir = ".", isICA = True, RmsWindowSizeInMs =
                 mean_occurences = xp.mean(stateAccrossEdf[start:end])
                 chunk_summary["start"] = start
                 chunk_summary["end"] = end
+                chunk_summary["mean_occurences"] = mean_occurences
                 log(f"Id : {chunk_id} ; {stateToAnalyze}s : {mean_occurences}")
                 summaries.append(chunk_summary)
             
