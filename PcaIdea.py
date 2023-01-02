@@ -13,6 +13,7 @@ from scipy.stats import zscore
 from EdfAnalyzer import EdfAnalyzer
 from HelperFunctions import cleanSpace, matrixCorrelation
 from os import path
+from skimage.metrics import structural_similarity
 
 num_components = 16
 
@@ -66,7 +67,7 @@ signals = []
 chunks = []
 freq = 0
 
-ica_type = "together" # none, together, or seperate
+ica_type = "none" # none, together, or seperate
 isZscore = True
 
 # read both EDF files
@@ -118,10 +119,10 @@ cleanSpace()
 
 if isZscore:
     for p in [A,B]:
-        independentComponents[p] = np.array([zscore(x) for x in independentComponents[p]])
+        independentComponents[p] = zscore(independentComponents[p], axis=1)
 
 for key in chunks[0]:
-    fig, axs = plt.subplots(1, 2)
+    #fig, axs = plt.subplots(1, 2)
     chunk_data = [[],[]]
     for participant in [A,B]:
         chunk = chunks[participant][key]
@@ -131,12 +132,16 @@ for key in chunks[0]:
         #chunk_data = EdfAnalyzer.getIntervalWithWindowReduction(Y, chunk_start, chunk_end)
         #chunk_data = np.diff(independentComponents[participant][: , chunk_start:chunk_end])
         #chunk_data = np.diff(EdfAnalyzer.getIntervalWithWindowDivision(Y, chunk_start, chunk_end))
-        axs[participant].imshow(chunk_data[participant], cmap='hot', aspect='auto', interpolation="gaussian")
-        axs[participant].set_title(f"Participant : {participant}, time: {key}")
-    fname = path.join(path.dirname(pathProperties[0]), "Heatmaps", fr"{key}.png")
-    plt.show()
-    plt.savefig(fname)
-    plt.clf()
+        #axs[participant].imshow(chunk_data[participant], cmap='hot', aspect='auto', interpolation="gaussian")
+        #axs[participant].set_title(f"Participant : {participant}, time: {key}")
+    #fname = path.join(path.dirname(pathProperties[0]), "Heatmaps", fr"{key}.png")
+    #plt.show()
+    #plt.savefig(fname)
+    #plt.clf()
+    end = min(chunk_data[A].shape[1], chunk_data[B].shape[1])
+    ssim  = structural_similarity(chunk_data[A][: , 0:end], chunk_data[B][: , 0:end], gaussian_weights = False,
+                                sigma = 1.5, use_sample_covariance = False, multichannel=True)
+    print(f"key : {key}, ssim: {ssim}")
 
 
 # for state in states :

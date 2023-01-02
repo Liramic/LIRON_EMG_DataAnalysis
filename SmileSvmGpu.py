@@ -88,7 +88,7 @@ A=0
 B=1
 
 
-def PredictSmiles(sessionId, workingDir = ".", isICA = True, RmsWindowSizeInMs = 30, stateToAnalyze="smile"):
+def PredictSmiles(sessionId, workingDir = ".", isICA = True, RmsWindowSizeInMs = 50, stateToAnalyze="smile"):
     if ( workingDir!= "."):
         os.chdir(workingDir)
     
@@ -102,7 +102,7 @@ def PredictSmiles(sessionId, workingDir = ".", isICA = True, RmsWindowSizeInMs =
         log(f"reading {path}, correction: {correction}")
         f = pyedflib.EdfReader(path)
         Y, freq = EdfAnalyzer.readEdf(f, doButter=True)
-        anotations_chunks = EdfAnalyzer.getAnnotationChunks(f, correction)
+        anotations_chunks = EdfAnalyzer.getAnnotationChunks(f, correction, RmsWindowSizeInMs)
         f.close()
         Y = EdfAnalyzer.RemoveDataUntilStart(anotations_chunks, Y, freq)
         cleanSpace()
@@ -130,22 +130,24 @@ def PredictSmiles(sessionId, workingDir = ".", isICA = True, RmsWindowSizeInMs =
 
         # ------------------- RMS ------------------- #
 
-        x = EdfAnalyzer.window_rms(x, window_size = RmsWindowSizeInMs)
+        #x = EdfAnalyzer.window_rms(x, window_size = RmsWindowSizeInMs)
+        x = EdfAnalyzer.window_rms_downsample_no_cut(x, RmsWindowSizeInMs)
         cleanSpace()
         
         # ------------------- zscore ------------------- #
         #log("zscore")
         #x = xp.asarray(zscore(x,1))
         x = xp.asarray(x)
+        print(x.shape)
 
         # ------------------- divide to sets ------------------- #
         for state in states:
             log(f"start state {state}")
             ticks = EdfAnalyzer.getCallibrationTicks(anotations_chunks, freq, state)
             for tickIndex in range(int(len(ticks)/2)):
-                start = ticks[2*tickIndex]
-                end =   ticks[2*tickIndex+1]
-                
+                start = int(ticks[2*tickIndex])
+                end =   int(ticks[2*tickIndex+1])
+
                 m = x[:, start:end]
                 
                 if ( type(tagged_x) == type(None)):
@@ -218,7 +220,7 @@ def PredictSmiles(sessionId, workingDir = ".", isICA = True, RmsWindowSizeInMs =
                 mean_occurences = xp.mean(stateAccrossEdf[start:end])
                 chunk_summary["start"] = start
                 chunk_summary["end"] = end
-                chunk_summary["mean_occurences"] = mean_occurences
+                chunk_summary["mean_occurences"] = float(mean_occurences)
                 log(f"Id : {chunk_id} ; {stateToAnalyze}s : {mean_occurences}")
                 summaries.append(chunk_summary)
             
