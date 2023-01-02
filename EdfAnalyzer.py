@@ -160,19 +160,41 @@ class EdfAnalyzer:
         return np.array([window_rms_single(x,window_size) for x in a])
 
     @staticmethod
+    def window_rms_downsample(a, window_size_in_ms):
+        window_size = window_size_in_ms*4 # divide by 1000, and multiply by 4000
+        windows = np.array_split(a, a.shape[1] // (window_size/2), axis=1)
+        rms_values = None
+        for i in range(len(windows)-1):
+            window = np.append(windows[i], windows[i+1], axis=1)
+            rms = np.sqrt(np.mean(window**2, axis=1))
+            if i == 0:
+                rms_values = rms
+            else:
+                rms_values = np.append(rms_values, rms)
+        return np.reshape(rms_values, (16, len(rms_values)//16))
+
+    def window_rms_downsample_no_cut(a, window_size_in_ms):
+        window_size = window_size_in_ms*4 # divide by 1000, and multiply by 4000
+        windows = np.array_split(a, a.shape[1] // (window_size), axis=1)
+        rms_values = np.array([])
+        for window in windows:
+            rms_values = np.append(rms_values, np.sqrt(np.mean(window**2, axis=1)))
+        return np.reshape(rms_values, (16, len(rms_values)//16))
+
+    @staticmethod
     def getCallibrationTicks(chunks, freq, calibration_state_to_analyze = "smile"):
         return GetCallibrationsTicks(chunks, freq, calibration_state_to_analyze)
 
     startCorrectionTime = 0
 
     @staticmethod
-    def getAnnotationChunks(f : pyedflib.EdfReader, correctBy):
+    def getAnnotationChunks(f : pyedflib.EdfReader, correctBy, RmsDownsampleWindow = 0):
         annotations = f.readAnnotations()
         startIndex = np.where(annotations[2] == "StartExperiment")[0][-1]
         #correctByIdx = np.where(annotations[2] == "Recording Started")[0][0]
         endIndex = len(annotations[2])
         startCorrectIdx = np.where(annotations[2] == "Smile_0_start")[0][0]
-        __class__.startCorrectionTime = annotations[0][startCorrectIdx] - 120
+        __class__.startCorrectionTime = annotations[0][startCorrectIdx] - 60
         #correctBy = annotations[0][correctByIdx]
         chunks = dict()
         #chunks["ExperimentStartTime"] = startExperimentTime - correctBy
@@ -184,6 +206,8 @@ class EdfAnalyzer:
             if ( not isMyAnnotation(annotation)):
                 continue
             timing = annotations[0][i] - correctBy - __class__.startCorrectionTime # fix error by xTrodes.
+            if ( RmsDownsampleWindow != 0 ):
+                timing = timing/(int(4*RmsDownsampleWindow)) # 4*RmsDownsampleWindow // 2 if cut, otherwise - without the division -- 4*RmsDownSampleWindow
             extractedAnnotation = extractAnnotation(annotation, timing)
             index = "%s_%s_%d" % (extractedAnnotation.Type, extractedAnnotation.Story, extractedAnnotation.TrialId)
             if ( index in chunks):

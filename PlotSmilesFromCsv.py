@@ -4,7 +4,7 @@ import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 from scipy import signal
 from scipy.stats import zscore
-
+from skimage.metrics import structural_similarity
 
 def ArrayReverse(arr):
     return arr[::-1]
@@ -71,9 +71,9 @@ B=1
 titles = []
 data = []
 ticks = []
-folder = "20112022_1545"
+folder = r"C:\Liron\DataEmg\Done\20122022_1415"
 stateToAnalyze = "smile"
-svmType = "svc" # "svc"
+svmType = "svr" # "svc"
 
 path = fr"{folder}\{stateToAnalyze}\{svmType}"
 
@@ -93,7 +93,9 @@ for i in range(0,len(ticksPairWise[0])):
     A_end = ticksPairWise[A][i][1]
     B_start = ticksPairWise[B][i][0]
     B_end = ticksPairWise[B][i][1]
-    corr = ComputeCrossCorrToEnvelope(data[A][A_start:A_end],data[B][B_start:B_end])
+    sizeOfPart = min(A_end-A_start, B_end - B_start)
+    corr = structural_similarity(data[A][A_start:A_start+sizeOfPart], data[B][B_start:B_start+sizeOfPart], gaussian_weights = False,
+                        sigma = 1.5, use_sample_covariance = False, multichannel=False)
     print(f"{titles[i]} : {corr}")
 
 

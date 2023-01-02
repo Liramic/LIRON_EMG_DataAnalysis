@@ -124,7 +124,7 @@ for key in sessions:
     for participant in [A,B]:
         for eventDictKey in sessions[key][participant]:
             #for event in sessions[key][participant]:
-            if ( "listen_1" in eventDictKey):
+            if ( "listen" in eventDictKey):
                 eventlist = sessions[key][participant][eventDictKey]
                 for i in range(0,2):
                     event = eventlist[i]
