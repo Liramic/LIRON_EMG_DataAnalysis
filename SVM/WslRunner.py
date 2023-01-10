@@ -1,6 +1,6 @@
-from SmileSvmGpu import PredictSmiles
+from SVM.SmileSvmGpu import PredictSmiles
 import os
-from HelperFunctions import cleanSpace, log
+from General.HelperFunctions import cleanSpace, log
 
 data_path = r'/mnt/c/Liron/DataEmg'
 

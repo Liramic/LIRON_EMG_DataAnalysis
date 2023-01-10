@@ -7,7 +7,7 @@ from sklearn.decomposition import FastICA
 from sklearn.decomposition import PCA
 import cupy as xp
 from scipy.signal import butter, sosfilt, filtfilt, sosfiltfilt
-from HelperFunctions import isMyAnnotation, cleanSpace
+from General.HelperFunctions import isMyAnnotation, cleanSpace
 
 #from mne.preprocessing import ICA
 #from picard import picard
@@ -180,6 +180,15 @@ class EdfAnalyzer:
         for window in windows:
             rms_values = np.append(rms_values, np.sqrt(np.mean(window**2, axis=1)))
         return np.reshape(rms_values, (16, len(rms_values)//16))
+    
+    
+    def window_rms_downsample_no_cut_faster(a, window_size_in_ms):
+        window_size = window_size_in_ms*4 # divide by 1000, and multiply by 4000
+        rms_values = np.array([])
+        squared = a**2
+        for i in range(0, a.shape[1]-window_size , window_size):
+            rms_values = np.append(rms_values, np.sqrt(np.mean(squared[:, i:i+window_size], axis=1)))
+        return np.reshape(rms_values, (16, len(rms_values)//16))
 
     @staticmethod
     def getCallibrationTicks(chunks, freq, calibration_state_to_analyze = "smile"):
@@ -190,6 +199,7 @@ class EdfAnalyzer:
     @staticmethod
     def getAnnotationChunks(f : pyedflib.EdfReader, correctBy, RmsDownsampleWindow = 0):
         annotations = f.readAnnotations()
+        file_sampling_rate = int(f.getSampleFrequency(0))
         startIndex = np.where(annotations[2] == "StartExperiment")[0][-1]
         #correctByIdx = np.where(annotations[2] == "Recording Started")[0][0]
         endIndex = len(annotations[2])
@@ -206,8 +216,9 @@ class EdfAnalyzer:
             if ( not isMyAnnotation(annotation)):
                 continue
             timing = annotations[0][i] - correctBy - __class__.startCorrectionTime # fix error by xTrodes.
+            # Todo - return anyway a timing*sr - this makes much more sense...
             if ( RmsDownsampleWindow != 0 ):
-                timing = timing/(int(4*RmsDownsampleWindow)) # 4*RmsDownsampleWindow // 2 if cut, otherwise - without the division -- 4*RmsDownSampleWindow
+                timing = timing*file_sampling_rate/(int(4*RmsDownsampleWindow)) # 4*RmsDownsampleWindow // 2 if cut, otherwise - without the division -- 4*RmsDownSampleWindow
             extractedAnnotation = extractAnnotation(annotation, timing)
             index = "%s_%s_%d" % (extractedAnnotation.Type, extractedAnnotation.Story, extractedAnnotation.TrialId)
             if ( index in chunks):

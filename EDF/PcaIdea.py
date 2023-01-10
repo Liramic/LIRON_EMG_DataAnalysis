@@ -10,8 +10,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import zscore
 #from torch import maximum
-from EdfAnalyzer import EdfAnalyzer
-from HelperFunctions import cleanSpace, matrixCorrelation
+from EDF.EdfAnalyzer import EdfAnalyzer
+from General.HelperFunctions import cleanSpace, matrixCorrelation
 from os import path
 from skimage.metrics import structural_similarity
 
@@ -87,7 +87,7 @@ independentComponents = [[], []]
 if ( ica_type != "none"):
     if ( ica_type == "together") :
         # Append Signals
-        appendedSignal = np.c_[signals[A], signals[B]]
+        appendedSignal = np.append(signals[A], signals[B], axis=1)
 
         # ICA 
         w, x = EdfAnalyzer.ICA(np.matrix(appendedSignal), num_channels) # W*Y = X

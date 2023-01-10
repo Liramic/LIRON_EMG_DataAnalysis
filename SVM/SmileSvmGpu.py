@@ -8,11 +8,11 @@ from sklearn.metrics import classification_report, confusion_matrix
 import cupy as xp
 import os
 from cupy import savetxt
-from EdfAnalyzer import EdfAnalyzer
+from EDF.EdfAnalyzer import EdfAnalyzer
 import gc
 import pandas as pd
 import json
-from HelperFunctions import toFilePath, getPathsFromSessionFolder, log
+from General.HelperFunctions import toFilePath, getPathsFromSessionFolder, log
 
 class UserChoice:
     def __init__(self, story1, story2, choiceA, choiceB, rtA, rtB, isOther) -> None:

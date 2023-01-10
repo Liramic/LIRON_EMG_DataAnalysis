@@ -71,7 +71,7 @@ B=1
 titles = []
 data = []
 ticks = []
-folder = r"C:\Liron\DataEmg\Done\20122022_1415"
+folder = r"C:\Liron\DataEmg\Done\20122022_0830"
 stateToAnalyze = "smile"
 svmType = "svr" # "svc"
 
