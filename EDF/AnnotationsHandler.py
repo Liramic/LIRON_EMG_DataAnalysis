@@ -1,4 +1,4 @@
-from HelperFunctions import toFilePath, getPathsFromSessionFolder, getFirstCsvFile
+from General.HelperFunctions import toFilePath, getPathsFromSessionFolder, getFirstCsvFile
 import pandas as pd
 import numpy as np
 

@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import json
 import os
 import cupy as xp
-from HelperFunctions import cleanSpace
+from General.HelperFunctions import cleanSpace
 
 def getInt(value):
     if(value==None):
